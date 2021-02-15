@@ -1,2 +1,5 @@
 info/
 .idea/
+__pycache__/
+env/
+log/
