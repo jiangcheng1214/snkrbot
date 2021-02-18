@@ -8,6 +8,10 @@ from selenium import webdriver
 import signal
 from contextlib import contextmanager
 
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions
+from selenium.webdriver.support.wait import WebDriverWait
+
 cnt = 0
 
 
@@ -17,6 +21,35 @@ def wait_until(start_time):
     if seconds_until_release_time > 0:
         time.sleep(seconds_until_release_time)
 
+def wait_until_clickable(driver, xpath=None, class_name=None, el_id=None, duration=10000, frequency=0.01):
+    if xpath:
+        WebDriverWait(driver, duration, frequency).until(expected_conditions.element_to_be_clickable((By.XPATH, xpath)))
+    elif class_name:
+        WebDriverWait(driver, duration, frequency).until(expected_conditions.element_to_be_clickable((By.CLASS_NAME, class_name)))
+    elif el_id:
+        WebDriverWait(driver, duration, frequency).until(expected_conditions.element_to_be_clickable((By.ID, el_id)))
+
+def wait_until_presence(driver, xpath=None, class_name=None, el_id=None, duration=10000, frequency=0.01):
+    if xpath:
+        WebDriverWait(driver, duration, frequency).until(
+            expected_conditions.presence_of_element_located((By.XPATH, xpath)))
+    elif class_name:
+        WebDriverWait(driver, duration, frequency).until(
+            expected_conditions.presence_of_element_located((By.CLASS_NAME, class_name)))
+    elif el_id:
+        WebDriverWait(driver, duration, frequency).until(
+            expected_conditions.presence_of_element_located((By.ID, el_id)))
+
+def wait_until_invisible(driver, xpath=None, class_name=None, el_id=None, duration=10000, frequency=0.01):
+    if xpath:
+        WebDriverWait(driver, duration, frequency).until(
+            expected_conditions.invisibility_of_element_located((By.XPATH, xpath)))
+    elif class_name:
+        WebDriverWait(driver, duration, frequency).until(
+            expected_conditions.invisibility_of_element_located((By.CLASS_NAME, class_name)))
+    elif el_id:
+        WebDriverWait(driver, duration, frequency).until(
+            expected_conditions.invisibility_of_element_located((By.ID, el_id)))
 
 def log(string):
     print("[{}] {}".format(datetime.datetime.now(), string))
