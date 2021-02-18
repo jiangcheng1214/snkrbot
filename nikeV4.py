@@ -47,7 +47,7 @@ class NikeBot:
         self.start_time = start_time
         self.window_index_list_list = []
         self.url_wait_time_map = {}
-        self.waiting_time_list = [5]
+        self.waiting_time_list = [3, 5]
         self.url_results = {}
         self.thread_id = thread_id
 
@@ -359,7 +359,7 @@ class NikeBot:
                             break
                     if not self.add_to_cart():
                         self.url_wait_time_map[window_index] = datetime.datetime.now()
-                        self.log("Refresh now")
+                        self.log("Refresh now after adding cart failure")
                         self.driver.refresh()
                     else:
                         self.driver.get(NIKE_CHECKOUT_URL)
@@ -382,9 +382,13 @@ class MyThread(threading.Thread):
 
 
 url_size_metadata_list = [
-    ("https://www.nike.com/launch/t/air-jordan-1-zoom-paris-saint-germain", ['M6'], True),
+    ("https://www.nike.com/launch/t/womens-dunk-low-coast", ['7.5'], True),
+    ("https://www.nike.com/launch/t/dunk-low-hyper-cobalt", ['7.5'], True),
+    ("https://www.nike.com/launch/t/dunk-low-medium-grey", ['7.5'], True),
+    ("https://www.nike.com/launch/t/air-huarache-st%C3%BCssy-desert-oak", ['7.5'], True),
+    # ("https://www.nike.com/launch/t/air-force-1-1-cosmic-clay", ['M6'], True),
 ]  # step 1: fill in right product information
-start_run_time = datetime.datetime(2021, 2, 17, 6, 59)  # step 2: fill in right date
+start_run_time = datetime.datetime(2021, 2, 18, 6, 59)  # step 2: fill in right date
 
 threads = []
 for ind in range(len(BOT_INFO["credentials"])):
