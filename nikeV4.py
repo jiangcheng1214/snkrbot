@@ -6,6 +6,7 @@ import time
 from random import random
 
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -13,8 +14,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
-from utils import log, wait_until, type_with_delay, log_exception, save_page, wait_until_clickable, wait_until_presence, \
-    wait_until_invisible
+from utils import log, wait_until, type_with_delay, log_exception, save_page, wait_until_clickable, wait_until_invisible
 
 call_site = 'nikeV4'
 size_dropdown_xpath = '//button[@data-qa="size-dropdown"]'
@@ -56,23 +56,41 @@ class NikeBot:
 
     def log_in(self):
         self.driver.get("https://www.nike.com/launch")
-        try:
-            wait_until_clickable(driver=self.driver, xpath='//button[@data-qa="top-nav-join-or-login-button"]')
-            self.driver.find_elements_by_xpath('//button[@data-qa="top-nav-join-or-login-button"]')[0].click()
-            wait_until_clickable(driver=self.driver, xpath='//input[@type="email"]')
-            if self.driver.find_elements_by_xpath('//input[@name="keepMeLoggedIn"]'):
-                self.driver.find_elements_by_xpath('//input[@name="keepMeLoggedIn"]')[0].send_keys(' ')
-            if not type_with_delay(self.driver, '//input[@type="email"]', self.email):
+        time.sleep(2)
+        while not self.driver.find_elements_by_xpath('//span[@data-qa="user-name"]'):
+            try:
+                WebDriverWait(self.driver, 1).until(expected_conditions.presence_of_element_located(
+                    (By.XPATH, '//button[@data-qa="top-nav-join-or-login-button"]')))
+                if self.driver.find_elements_by_xpath('//button[@data-qa="top-nav-join-or-login-button"]'):
+                    self.driver.find_elements_by_xpath('//button[@data-qa="top-nav-join-or-login-button"]')[0].click()
+                else:
+                    self.log("Missing: {}".format('//button[@data-qa="top-nav-join-or-login-button"]'))
+                    return False
+                WebDriverWait(self.driver, 1).until(
+                    expected_conditions.presence_of_element_located((By.XPATH, '//input[@type="email"]')))
+                time.sleep(0.5)
+                if self.driver.find_elements_by_xpath('//input[@name="keepMeLoggedIn"]'):
+                    self.driver.find_elements_by_xpath('//input[@name="keepMeLoggedIn"]')[0].send_keys(' ')
+                if not type_with_delay(self.driver, '//input[@type="email"]', self.email):
+                    return False
+                time.sleep(2)
+                if not type_with_delay(self.driver, '//input[@type="password"]', self.password):
+                    return False
+                time.sleep(1)
+                self.driver.find_elements_by_xpath('//input[@type="password"]')[0].send_keys(Keys.ENTER)
+                WebDriverWait(self.driver, 5).until(expected_conditions.presence_of_element_located(
+                    (By.XPATH, '//span[@data-qa="user-name"]')))
+            except TimeoutException:
+                if self.driver.find_elements_by_xpath('//input[@value="Dismiss this error"]'):
+                    self.log("Found: {}".format('//input[@value="Dismiss this error"]'))
+                    self.driver.find_elements_by_xpath('//input[@value="Dismiss this error"]')[0].click()
+                    self.log("Dismissed: {}".format('//input[@value="Dismiss this error"]'))
+                self.driver.refresh()
+                time.sleep(2)
+                continue
+            except Exception as e:
+                log_exception(e, self.driver, "{} - {}".format(call_site, self.thread_id))
                 return False
-            time.sleep(0.5)
-            if not type_with_delay(self.driver, '//input[@type="password"]', self.password):
-                return False
-            time.sleep(0.5)
-            self.driver.find_elements_by_xpath('//input[@type="password"]')[0].send_keys(Keys.ENTER)
-            wait_until_presence(driver=self.driver, xpath='//button[@data-qa="top-nav-join-or-login-button"]')
-        except Exception as e:
-            log_exception(e, self.driver, "{} - {}".format(call_site, self.thread_id))
-            return False
         return True
 
     def select_size(self, target_size):
@@ -201,28 +219,6 @@ class NikeBot:
         self.log("No known clickable button after selecting size")
         return False
 
-    # def enter_cv_number(self):
-    #     try:
-    #         cv_number_input = self.driver.find_element_by_xpath('//input[@id="cvNumber"]')
-    #         for num in BOT_INFO["cv_number"]:
-    #             cv_number_input.send_keys(num)
-    #             time.sleep(random() / 10)
-    #         return True
-    #     except Exception:
-    #         self.log("cannot input cv number")
-    #     try:
-    #         self.driver.switch_to.frame(
-    #             self.driver.find_element_by_xpath('//iframe[@sandbox="allow-scripts allow-same-origin"]'))
-    #         cv_number_input = self.driver.find_element_by_xpath('//input[@id="cvNumber"]')
-    #         for num in BOT_INFO["cv_number"]:
-    #             cv_number_input.send_keys(num)
-    #             time.sleep(random() / 10)
-    #         self.driver.switch_to.default_content()
-    #         return True
-    #     except Exception:
-    #         self.log("cannot input cv number")
-    #     return False
-
     def enter_security_code_if_needed(self):
         if self.driver.find_elements_by_xpath('//p[text()="Please re-enter a security code:"]'):
             iframe_count = len(
@@ -239,89 +235,6 @@ class NikeBot:
                         time.sleep(random() / 10)
                 self.driver.switch_to.default_content()
                 self.log("Switched to default content")
-
-    # def enter_payment_information(self):
-    #     try:
-    #         iframe_count = len(
-    #             self.driver.find_elements_by_xpath('//iframe[@sandbox="allow-scripts allow-same-origin"]'))
-    #         self.log("iframe count {}".format(iframe_count))
-    #         if iframe_count < 1:
-    #             self.log("iframe count is 0")
-    #             if self.enter_cv_number():
-    #                 return True
-    #             try:
-    #                 self.driver.find_element_by_xpath('//input[@data-qa="payment-radio"]').click()
-    #                 time.sleep(0.3)
-    #                 if self.enter_cv_number():
-    #                     return True
-    #             except Exception:
-    #                 self.log("cv_number cannot be added after clicking payment-radio")
-    #             try:
-    #                 self.driver.find_element_by_xpath('//span[@data-qa="payment-text"]').click()
-    #                 time.sleep(0.3)
-    #                 if self.enter_cv_number():
-    #                     return True
-    #             except Exception:
-    #                 self.log("cv_number cannot be added after clicking payment-text")
-    #             try:
-    #                 self.driver.find_element_by_xpath('//span[@data-qa="payment-icn"]').click()
-    #                 time.sleep(0.3)
-    #                 if self.enter_cv_number():
-    #                     return True
-    #             except Exception:
-    #                 self.log("cv_number cannot be added after clicking payment-icn")
-    #             return False
-    #         else:
-    #             self.driver.switch_to.frame(
-    #                 self.driver.find_elements_by_xpath('//iframe[@sandbox="allow-scripts allow-same-origin"]')[0])
-    #             self.log("Switched to iframe")
-    #             if self.driver.find_elements_by_xpath('//input[@id="creditCardNumber"]'):
-    #                 credit_card_input = self.driver.find_element_by_xpath('//input[@id="creditCardNumber"]')
-    #                 for num in BOT_INFO["card_number"]:
-    #                     credit_card_input.send_keys(num)
-    #                     time.sleep(random() / 10)
-    #                 expiration_date_input = self.driver.find_element_by_xpath('//input[@id="expirationDate"]')
-    #                 for num in BOT_INFO["card_expiration"]:
-    #                     expiration_date_input.send_keys(num)
-    #                     time.sleep(random() / 10)
-    #             if self.driver.find_elements_by_xpath('//input[@id="cvNumber"]'):
-    #                 cv_number_input = self.driver.find_element_by_xpath('//input[@id="cvNumber"]')
-    #                 for num in BOT_INFO["cv_number"]:
-    #                     cv_number_input.send_keys(num)
-    #                     time.sleep(random() / 10)
-    #             self.driver.switch_to.default_content()
-    #             self.log("Switched to default content")
-    #             return True
-    #     except Exception as e:
-    #         self.driver.switch_to.default_content()
-    #         log_exception(e, self.driver, "{} - {}".format(call_site, self.thread_id))
-    #         self.log("Handle payment failed")
-    #         return False
-
-    # def handle_pop_out_payment(self):
-    #     time.sleep(1)
-    #     if not self.driver.find_elements_by_xpath(continue_button_xpath):
-    #         self.log("Continue button is not found!")
-    #         return False
-    #     if not self.driver.find_elements_by_xpath(submit_order_xpath):
-    #         self.log("Submit button is not found!")
-    #         return False
-    #     if self.driver.find_elements_by_xpath(
-    #             '//button[@data-qa="save-button" and text()="Save & Continue" and contains(@class, "disabled")]'):
-    #         # Need to enter CV number
-    #         entered_payment = self.enter_payment_information()
-    #         self.log("entered_payment = {}".format(entered_payment))
-    #     i = 0
-    #     while i < len(self.driver.find_elements_by_xpath(continue_button_xpath)):
-    #         self.log("current i = {}".format(i))
-    #         try:
-    #             self.driver.find_elements_by_xpath(continue_button_xpath)[i].click()
-    #             self.log('clicked Save & Continue button i = {}'.format(i))
-    #             break
-    #         except Exception as e:
-    #             log_exception(e, self.driver, "{} - {}".format(call_site, self.thread_id))
-    #         i += 1
-    #     return True
 
     def click_place_order_button(self):
         try:
@@ -454,56 +367,6 @@ class NikeBot:
                     should_buy = self.url_size_metadata_list[url_index][2]
                     if should_buy:
                         self.click_place_order_button()
-
-                    # checkout_section_found = len(
-                    #     self.driver.find_elements_by_xpath('//div[@id="checkout-sections"]')) > 0
-                    # if checkout_section_found:
-                    #     self.log("CHECKOUT SECTION DETECTED")
-                    # else:
-                    #     if not selected_size:
-                    #         if self.driver.find_elements_by_xpath(
-                    #                 '//div[text()="VERIFY YOUR MOBILE NUMBER"]') and self.driver.find_elements_by_xpath(
-                    #             '//input[@class="phoneNumber"]'):
-                    #             self.log("Verify mobile number pop out!")
-                    #             self.url_results[url_index] = "VERIFY YOUR MOBILE NUMBER"
-                    #             break
-                    #         self.url_wait_time_map[window_index] = datetime.datetime.now()
-                    #         self.log("Refresh now")
-                    #         self.driver.refresh()
-                    #         continue
-                    #     clicked_buy_button = self.add_to_cart()
-                    #     if not clicked_buy_button:
-                    #         self.url_wait_time_map[window_index] = datetime.datetime.now()
-                    #         self.log("Refresh now")
-                    #         self.driver.refresh()
-                    #         continue
-                    #     self.log("BUY BUTTON clicked")
-                    # try:
-                    #     WebDriverWait(self.driver, 2).until(expected_conditions.presence_of_element_located(
-                    #         (By.XPATH, '//button[@data-qa="save-button"]')))
-                    #     self.log("Detected payment pop out")
-                    #     if not self.handle_pop_out_payment():
-                    #         self.log("payment not handled! refreshing")
-                    #         save_page(self.driver, "{} - {}".format(call_site, self.thread_id))
-                    #         self.url_wait_time_map[window_index] = datetime.datetime.now()
-                    #         self.driver.refresh()
-                    #         continue
-                    #     should_buy = self.url_size_metadata_list[url_index][2]
-                    #     if self.submit_order(should_buy):
-                    #         self.url_results[url_index] = "SUCCESS"
-                    #         self.log("Finished checkout")
-                    #         break
-                    #     else:
-                    #         self.log("Failed to checkout! refreshing")
-                    #         save_page(self.driver, "{} - {}".format(call_site, self.thread_id))
-                    #         self.url_wait_time_map[window_index] = datetime.datetime.now()
-                    #         self.driver.refresh()
-                    # except TimeoutException:
-                    #     self.log("payment pop out is not detected")
-                    #     save_page(self.driver, "{} - {}".format(call_site, self.thread_id))
-                    #     self.url_wait_time_map[window_index] = datetime.datetime.now()
-                    #     self.driver.refresh()
-                    #     continue
         log("RESULTS - {}: {}".format(self.thread_id, self.url_results))
 
 
