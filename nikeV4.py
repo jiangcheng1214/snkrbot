@@ -4,17 +4,18 @@ import os
 import threading
 import time
 from random import random
+import enum
 
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.keys import Keys
 
-from utils import log, wait_until, type_with_delay, log_exception, save_page, wait_until_clickable, wait_until_invisible
+from utils import log, wait_until, type_with_delay, log_exception, save_page
 
 call_site = 'nikeV4'
 size_dropdown_xpath = '//button[@data-qa="size-dropdown"]'
@@ -25,8 +26,7 @@ spinner_xpath = '//img[@data-qa="spinner-img"]'
 submit_order_xpath = '//button[@data-qa="save-button" and text()="Submit Order"]'
 continue_button_xpath = '//button[@data-qa="save-button" and text()="Save & Continue"]'
 
-NIKE_CHECKOUT_URL = "https://www.nike.com/checkout"
-
+refresh_wait_time_in_second = 5
 # Step 0: fill in payment information and emails
 
 BOT_INFO = json.loads(open(os.path.dirname(os.path.abspath(__file__)) + '/info/information.json', "r").read())
@@ -34,7 +34,7 @@ BOT_INFO = json.loads(open(os.path.dirname(os.path.abspath(__file__)) + '/info/i
 
 class NikeBot:
 
-    def __init__(self, email, password, cv_code, url_size_metadata_list, start_time, headless, thread_id):
+    def __init__(self, email, password, cv_number, url_size_metadata_list, start_time, headless, thread_id):
         options = Options()
         options.add_argument("--window-size=2560,1417")
         if headless:
@@ -42,12 +42,11 @@ class NikeBot:
         self.driver = webdriver.Chrome('/usr/local/bin/chromedriver', options=options)
         self.email = email
         self.password = password
-        self.cv_number = cv_code
+        self.cv_number = cv_number
         self.url_size_metadata_list = url_size_metadata_list
         self.start_time = start_time
         self.window_index_list_list = []
         self.url_wait_time_map = {}
-        self.waiting_time_list = [3, 5]
         self.url_results = {}
         self.thread_id = thread_id
 
@@ -143,6 +142,7 @@ class NikeBot:
         return False
 
     def add_to_cart(self):
+        time.sleep(0.2)
         if self.driver.find_elements_by_xpath('//button[@data-qa="add-to-cart"]'):
             try:
                 self.driver.find_elements_by_xpath('//button[@data-qa="add-to-cart"]')[0].click()
@@ -152,6 +152,7 @@ class NikeBot:
                 return False
             return True
         elif self.driver.find_elements_by_xpath('//button[@data-qa="feed-buy-cta"]'):
+            # sorted(d.find_elements_by_xpath('//button[@data-qa="feed-buy-cta"]'),key=lambda x: convert_price_text_to_int(x.text), reverse=True)[0].click()
             try:
                 buy_button = self.driver.find_elements_by_xpath('//button[@data-qa="feed-buy-cta"]')[0]
                 actions = ActionChains(self.driver)
@@ -219,33 +220,110 @@ class NikeBot:
         self.log("No known clickable button after selecting size")
         return False
 
-    def enter_security_code_if_needed(self):
-        if self.driver.find_elements_by_xpath('//p[text()="Please re-enter a security code:"]'):
+    def enter_cv_number(self):
+        try:
+            cv_number_input = self.driver.find_element_by_xpath('//input[@id="cvNumber"]')
+            for num in self.cv_number:
+                cv_number_input.send_keys(num)
+                time.sleep(random() / 10)
+            return True
+        except Exception:
+            self.log("cannot input cv number")
+        try:
+            self.driver.switch_to.frame(
+                self.driver.find_element_by_xpath('//iframe[@sandbox="allow-scripts allow-same-origin"]'))
+            cv_number_input = self.driver.find_element_by_xpath('//input[@id="cvNumber"]')
+            for num in self.cv_number:
+                cv_number_input.send_keys(num)
+                time.sleep(random() / 10)
+            self.driver.switch_to.default_content()
+            return True
+        except Exception:
+            self.log("cannot input cv number")
+        return False
+
+    def enter_payment_information(self):
+        try:
             iframe_count = len(
                 self.driver.find_elements_by_xpath('//iframe[@sandbox="allow-scripts allow-same-origin"]'))
             self.log("iframe count {}".format(iframe_count))
-            if iframe_count == 1:
+            if iframe_count < 1:
+                self.log("iframe count is 0")
+                if self.enter_cv_number():
+                    return True
+                try:
+                    self.driver.find_element_by_xpath('//input[@data-qa="payment-radio"]').click()
+                    time.sleep(0.3)
+                    if self.enter_cv_number():
+                        return True
+                except Exception:
+                    self.log("cv_number cannot be added after clicking payment-radio")
+                try:
+                    self.driver.find_element_by_xpath('//span[@data-qa="payment-text"]').click()
+                    time.sleep(0.3)
+                    if self.enter_cv_number():
+                        return True
+                except Exception:
+                    self.log("cv_number cannot be added after clicking payment-text")
+                try:
+                    self.driver.find_element_by_xpath('//span[@data-qa="payment-icn"]').click()
+                    time.sleep(0.3)
+                    if self.enter_cv_number():
+                        return True
+                except Exception:
+                    self.log("cv_number cannot be added after clicking payment-icn")
+                return False
+            else:
                 self.driver.switch_to.frame(
                     self.driver.find_elements_by_xpath('//iframe[@sandbox="allow-scripts allow-same-origin"]')[0])
                 self.log("Switched to iframe")
+                if self.driver.find_elements_by_xpath('//input[@id="creditCardNumber"]'):
+                    credit_card_input = self.driver.find_element_by_xpath('//input[@id="creditCardNumber"]')
+                    for num in BOT_INFO["card_number"]:
+                        credit_card_input.send_keys(num)
+                        time.sleep(random() / 10)
+                    expiration_date_input = self.driver.find_element_by_xpath('//input[@id="expirationDate"]')
+                    for num in BOT_INFO["card_expiration"]:
+                        expiration_date_input.send_keys(num)
+                        time.sleep(random() / 10)
                 if self.driver.find_elements_by_xpath('//input[@id="cvNumber"]'):
                     cv_number_input = self.driver.find_element_by_xpath('//input[@id="cvNumber"]')
-                    for num in self.cv_number:
+                    for num in BOT_INFO["cv_number"]:
                         cv_number_input.send_keys(num)
                         time.sleep(random() / 10)
                 self.driver.switch_to.default_content()
                 self.log("Switched to default content")
-
-    def click_place_order_button(self):
-        try:
-            xpath = "//button[text()='Place Order']"
-            wait_until_clickable(self.driver, xpath=xpath, duration=10)
-            self.driver.find_element_by_xpath(xpath).click()
-            save_page(self.driver, "{} - {}".format(call_site, self.thread_id))
-            wait_until_invisible(self.driver, xpath=xpath, duration=10)
-            save_page(self.driver, "{} - {}".format(call_site, self.thread_id))
+                return True
         except Exception as e:
+            self.driver.switch_to.default_content()
             log_exception(e, self.driver, "{} - {}".format(call_site, self.thread_id))
+            self.log("Handle payment failed")
+            return False
+
+    def handle_pop_out_payment(self):
+        time.sleep(1)
+        if not self.driver.find_elements_by_xpath(continue_button_xpath):
+            self.log("Continue button is not found!")
+            return False
+        if not self.driver.find_elements_by_xpath(submit_order_xpath):
+            self.log("Submit button is not found!")
+            return False
+        if self.driver.find_elements_by_xpath(
+                '//button[@data-qa="save-button" and text()="Save & Continue" and contains(@class, "disabled")]'):
+            # Need to enter CV number
+            entered_payment = self.enter_payment_information()
+            self.log("entered_payment = {}".format(entered_payment))
+        i = 0
+        while i < len(self.driver.find_elements_by_xpath(continue_button_xpath)):
+            self.log("current i = {}".format(i))
+            try:
+                self.driver.find_elements_by_xpath(continue_button_xpath)[i].click()
+                self.log('clicked Save & Continue button i = {}'.format(i))
+                break
+            except Exception as e:
+                log_exception(e, self.driver, "{} - {}".format(call_site, self.thread_id))
+            i += 1
+        return True
 
     def submit_order(self, should_buy):
         self.log("Going to submit order")
@@ -305,17 +383,16 @@ class NikeBot:
                 break
         for url_index in range(len(self.url_size_metadata_list)):
             self.window_index_list_list.append([])
-            for i in self.waiting_time_list:
-                try:
-                    url = self.url_size_metadata_list[url_index][0]
-                    self.driver.execute_script("window.open('{}');".format(url))
-                    time.sleep(0.5)
-                    window_index = len(self.driver.window_handles) - 1
-                    self.window_index_list_list[url_index].append(window_index)
-                    self.url_wait_time_map[window_index] = datetime.datetime.now()
-                    self.log("New window opened url:{} index:{}".format(url, window_index))
-                except Exception as e:
-                    log_exception(e, self.driver, "{} - {}".format(call_site, self.thread_id))
+            try:
+                url = self.url_size_metadata_list[url_index][0]
+                self.driver.execute_script("window.open('{}');".format(url))
+                time.sleep(0.5)
+                window_index = len(self.driver.window_handles) - 1
+                self.window_index_list_list[url_index].append(window_index)
+                self.url_wait_time_map[url] = datetime.datetime.now()
+                self.log("New window opened url:{} index:{}".format(url, window_index))
+            except Exception as e:
+                log_exception(e, self.driver, "{} - {}".format(call_site, self.thread_id))
 
         while len(self.url_results) < len(self.url_size_metadata_list):
             for url_index in range(len(self.url_size_metadata_list)):
@@ -347,33 +424,74 @@ class NikeBot:
                             self.log("URL:{} Still not launched..".format(url))
                         elif self.driver.find_elements_by_xpath(refreshing_xpath):
                             self.log("URL:{} Refreshing..".format(url))
-                        if (datetime.datetime.now() - self.url_wait_time_map[window_index]).total_seconds() > \
-                                self.waiting_time_list[window_index % len(self.waiting_time_list)]:
+                        if (datetime.datetime.now() - self.url_wait_time_map[window_index]).total_seconds() > refresh_wait_time_in_second:
                             self.url_wait_time_map[window_index] = datetime.datetime.now()
                             self.log("Refresh now")
                             self.driver.refresh()
                         continue
-                    for size in self.url_size_metadata_list[url_index][1]:
+
+                    selected_size = False
+                    for size in self.url_size_metadata_list[url_index][1][0]:
                         self.log("Size: {}".format(size))
                         if self.select_size(size):
+                            selected_size = True
                             break
-                    if not self.add_to_cart():
-                        self.url_wait_time_map[window_index] = datetime.datetime.now()
-                        self.log("Refresh now after adding cart failure")
-                        self.driver.refresh()
+                    checkout_section_found = len(
+                        self.driver.find_elements_by_xpath('//div[@id="checkout-sections"]')) > 0
+                    if checkout_section_found:
+                        self.log("CHECKOUT SECTION DETECTED")
                     else:
-                        self.driver.get(NIKE_CHECKOUT_URL)
-                    self.enter_security_code_if_needed()
-                    should_buy = self.url_size_metadata_list[url_index][2]
-                    if should_buy:
-                        self.click_place_order_button()
+                        if not selected_size:
+                            if self.driver.find_elements_by_xpath(
+                                    '//div[text()="VERIFY YOUR MOBILE NUMBER"]') and self.driver.find_elements_by_xpath(
+                                '//input[@class="phoneNumber"]'):
+                                self.log("Verify mobile number pop out!")
+                                self.url_results[url_index] = "VERIFY YOUR MOBILE NUMBER"
+                                break
+                            self.url_wait_time_map[window_index] = datetime.datetime.now()
+                            self.log("Refresh now")
+                            self.driver.refresh()
+                            continue
+                        clicked_buy_button = self.add_to_cart()
+                        if not clicked_buy_button:
+                            self.url_wait_time_map[window_index] = datetime.datetime.now()
+                            self.log("Refresh now")
+                            self.driver.refresh()
+                            continue
+                        self.log("BUY BUTTON clicked")
+                    try:
+                        WebDriverWait(self.driver, 2).until(expected_conditions.presence_of_element_located(
+                            (By.XPATH, '//button[@data-qa="save-button"]')))
+                        self.log("Detected payment pop out")
+                        if not self.handle_pop_out_payment():
+                            self.log("payment not handled! refreshing")
+                            save_page(self.driver, "{} - {}".format(call_site, self.thread_id))
+                            self.url_wait_time_map[window_index] = datetime.datetime.now()
+                            self.driver.refresh()
+                            continue
+                        should_buy = self.url_size_metadata_list[url_index][2]
+                        if self.submit_order(should_buy):
+                            self.url_results[url_index] = "SUCCESS"
+                            self.log("Finished checkout")
+                            break
+                        else:
+                            self.log("Failed to checkout! refreshing")
+                            save_page(self.driver, "{} - {}".format(call_site, self.thread_id))
+                            self.url_wait_time_map[window_index] = datetime.datetime.now()
+                            self.driver.refresh()
+                    except TimeoutException:
+                        self.log("payment pop out is not detected")
+                        save_page(self.driver, "{} - {}".format(call_site, self.thread_id))
+                        self.url_wait_time_map[window_index] = datetime.datetime.now()
+                        self.driver.refresh()
+                        continue
         log("RESULTS - {}: {}".format(self.thread_id, self.url_results))
 
 
 class MyThread(threading.Thread):
-    def __init__(self, url_size_metadata_list, email, password, cv_code, start_time, headless, thread_id):
+    def __init__(self, url_size_metadata_list, email, password, cv_number, start_time, headless, thread_id):
         threading.Thread.__init__(self)
-        self.bot = NikeBot(email, password, cv_code, url_size_metadata_list, start_time, headless, thread_id)
+        self.bot = NikeBot(email, password, cv_number, url_size_metadata_list, start_time, headless, thread_id)
         self.name = "{} - {}".format(email, url_size_metadata_list)
 
     def run(self):
@@ -382,18 +500,15 @@ class MyThread(threading.Thread):
 
 
 url_size_metadata_list = [
-    ("https://www.nike.com/launch/t/womens-dunk-low-coast", ['7.5'], True),
-    ("https://www.nike.com/launch/t/dunk-low-hyper-cobalt", ['7.5'], True),
-    ("https://www.nike.com/launch/t/dunk-low-medium-grey", ['7.5'], True),
-    ("https://www.nike.com/launch/t/air-huarache-st%C3%BCssy-desert-oak", ['7.5'], True),
-    # ("https://www.nike.com/launch/t/air-force-1-1-cosmic-clay", ['M6'], True),
+    ("https://www.nike.com/launch/t/air-jordan-14-clot-terracotta", ['M10'], True),
+    ("https://www.nike.com/launch/t/womens-air-jordan-1-silver-toe", ['M10'], True),
 ]  # step 1: fill in right product information
-start_run_time = datetime.datetime(2021, 2, 18, 6, 59)  # step 2: fill in right date
+start_run_time = datetime.datetime(2021, 2, 11, 6, 59)  # step 2: fill in right date
 
 threads = []
-for ind in range(len(BOT_INFO["credentials"])):
-    t = MyThread(url_size_metadata_list=url_size_metadata_list, email=BOT_INFO["credentials"][ind]["email"],
-                 password=BOT_INFO["credentials"][ind]["password"], cv_code=BOT_INFO["credentials"][ind]["cv_code"],
+for ind in range(len(BOT_INFO)):
+    t = MyThread(url_size_metadata_list=url_size_metadata_list, email=BOT_INFO[ind]["email"],
+                 password=BOT_INFO[ind]["password"], cv_number=BOT_INFO[ind]["cv_number"],
                  start_time=start_run_time,
                  headless=False, thread_id=ind)
     t.start()
