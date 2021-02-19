@@ -11,11 +11,11 @@ from contextlib import contextmanager
 cnt = 0
 
 
-def wait_until(start_time):
+def wait_until(start_time, seconds_in_advance):
     # start_time = datetime.datetime(2020, 7, 2, 6, 50)
-    seconds_until_release_time = (start_time - datetime.datetime.now()).total_seconds()
-    if seconds_until_release_time > 0:
-        time.sleep(seconds_until_release_time)
+    seconds_until_wake_up = (start_time - datetime.datetime.now()).total_seconds() - seconds_in_advance
+    if seconds_until_wake_up > 0:
+        time.sleep(seconds_until_wake_up)
 
 
 def log(string):
