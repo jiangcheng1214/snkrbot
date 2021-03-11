@@ -7,6 +7,7 @@ from random import random
 from selenium import webdriver
 import signal
 from contextlib import contextmanager
+import inspect
 
 cnt = 0
 
@@ -18,12 +19,15 @@ def wait_until(start_time, seconds_in_advance):
         time.sleep(seconds_until_wake_up)
 
 
-def log(string):
-    print("[{}] {}".format(datetime.datetime.now(), string))
+def log(string, site=""):
+    print("[{}][{}] {}".format(site, datetime.datetime.now(), string))
 
 
-def log_exception(e, driver, site):
-    print("[{}] Exception: {}\n    Exception Msg: {}".format(datetime.datetime.now(), type(e), e))
+def log_exception(driver, site):
+    callerframerecord = inspect.stack()[1]
+    frame = callerframerecord[0]
+    info = inspect.getframeinfo(frame)
+    print("[{}][{}] Exception!\n     File: {}\n     Line: {}".format(site, datetime.datetime.now(), info.filename, info.lineno))
     save_page(driver, site)
 
 
@@ -54,11 +58,11 @@ def save_page(driver, site):
         content = driver.page_source
         file_name = str(counter())
         file_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "log",
-                                datetime.datetime.today().strftime('%Y-%m-%d'), site)
+                                datetime.datetime.today().strftime('%Y-%m-%d'), str(site))
         if not os.path.exists(file_dir):
             os.makedirs(file_dir)
         html_file_path = os.path.join(file_dir, file_name + '.html')
-        log("Saving {}".format(html_file_path))
+        log("Saving {}".format(html_file_path), site)
         with open(html_file_path, 'w+') as f:
             f.write(content)
         screenshot_file_path = os.path.join(file_dir, file_name + '.png')
@@ -88,10 +92,3 @@ def time_limit(seconds):
         yield
     finally:
         signal.alarm(0)
-#
-# a = webdriver.Chrome('/usr/local/bin/chromedriver')
-#
-# d = webdriver.Chrome('/usr/local/bin/chromedriver')
-# a.get("https://www.nike.com/launch")
-# d.get("https://www.nike.com/launch")
-# time.sleep(20)
