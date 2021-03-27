@@ -35,7 +35,7 @@ class NikeBot:
 
     def __init__(self, email, password, cv_number, SNKRs, release_time, headless, thread_id):
         options = Options()
-        options.add_argument("--window-size=2560,1417")
+        options.add_argument("--window-size=1280,1417")
         if headless:
             options.add_argument("--headless")
         self.driver = webdriver.Chrome('/usr/local/bin/chromedriver', options=options)
@@ -132,6 +132,7 @@ class NikeBot:
                 except Exception as e:
                     log_exception(self.driver, self.thread_id)
                     self.log("Failed to click {}".format(size_button_xpath))
+
                     return False
         self.log("Size not found!")
         return False
@@ -418,23 +419,27 @@ class NikeBot:
                     time.sleep(0.5)
                     if self.driver.find_elements_by_xpath(spinner_xpath):
                         self.log("spinner is detected.")
-                    WebDriverWait(self.driver, 3).until(
+                    WebDriverWait(self.driver, 10).until(
                         expected_conditions.invisibility_of_element_located((By.XPATH, spinner_xpath)))
                     if self.driver.find_elements_by_xpath(spinner_xpath):
                         self.log("spinner is gone.")
                     time.sleep(0.5)
                     if self.driver.find_elements_by_xpath(sold_out_xpath):
-                        # sold out
-                        self.log("SOLD OUT at:{}".format(url))
-                        save_page(self.driver, self.thread_id)
-                        self.url_results[i] = "SOLD OUT"
-                        break
+                        # sold out (after 15 mins)
+                        seconds_since_release = (datetime.datetime.now() - self.release_time).total_seconds()
+                        if seconds_since_release > 60 * 15:
+                            self.log("SOLD OUT at:{}".format(url))
+                            save_page(self.driver, self.thread_id)
+                            self.url_results[i] = "SOLD OUT"
+                            break
                     elif self.driver.find_elements_by_xpath(notify_me_xpath):
                         self.log("Still waiting.. at:{}".format(url))
+                        save_page(self.driver, self.thread_id)
                         self.driver.refresh()
                         continue
                     elif self.driver.find_elements_by_xpath(spinner_xpath):
                         self.log("Still spinning.. at:{}".format(url))
+                        save_page(self.driver, self.thread_id)
                         continue
                     elif not self.driver.find_elements_by_xpath(size_dropdown_xpath):
                         self.log("Size list is not available.. at:{}".format(url))
@@ -457,23 +462,32 @@ class NikeBot:
                     continue
 
                 # size drop list is available
-                selected_size = False
-                for size in self.SNKRs[i].size_list:
-                    self.log("Size: {}".format(size))
-                    if self.select_size(size):
-                        selected_size = True
-                        break
-                save_page(self.driver, self.thread_id)
-                if not selected_size:
-                    self.log("failed to select size")
-                    self.driver.refresh()
-                    continue
-                clicked_buy_button = self.add_to_cart()
-                if not clicked_buy_button:
-                    self.log("failed to click buy button")
+                should_select_size = True
+                if self.driver.find_elements_by_xpath('//button[@data-qa="save-button"]'):
+                    # handle the case where size selection can be skipped (should be after a previous failure)
+                    self.log("Detected payment pop out before selecting size")
                     save_page(self.driver, self.thread_id)
-                    self.driver.refresh()
-                    continue
+                    should_select_size = False
+                if should_select_size:
+                    for size in self.SNKRs[i].size_list:
+                        self.log("Size: {}".format(size))
+                        if self.select_size(size):
+                            break
+                    save_page(self.driver, self.thread_id)
+
+                should_click_buy_button = True
+                if self.driver.find_elements_by_xpath('//button[@data-qa="save-button"]'):
+                    # handle the case where click buy button can be skipped (should be after a previous failure)
+                    self.log("Detected payment pop out before clicking buy")
+                    save_page(self.driver, self.thread_id)
+                    should_click_buy_button = False
+
+                if should_click_buy_button:
+                    if not self.add_to_cart():
+                        self.log("failed to click buy button")
+                        save_page(self.driver, self.thread_id)
+                        self.driver.refresh()
+                        continue
 
                 try:
                     if self.driver.find_elements_by_xpath('//a[@class="ncss-btn-primary-dark cta-btn btn-lg"]'):
@@ -550,15 +564,14 @@ class SNKR:
         self.is_debug = is_debug
 
 
-release_time = datetime.datetime(2021, 3, 10, 7, 0)
+release_time = datetime.datetime(2021, 3, 27, 7, 0)
 SNKRs = [
-    SNKR("https://www.nike.com/launch/t/womens-dunk-high-orange-blaze", ['7.5']),
-    SNKR("https://www.nike.com/launch/t/dunk-high-orange-blaze", ['6']),
-    SNKR("https://www.nike.com/launch/t/womens-dunk-low-black", ['7.5']),
-    SNKR("https://www.nike.com/launch/t/dunk-low-black", ['6']),
+    SNKR("https://www.nike.com/launch/t/air-max-1-clot-net", ['10']),
+    SNKR("https://www.nike.com/launch/t/air-jordan-5-stealth", ['10']),
 ]
 
 threads = []
+
 for ind in range(len(BOT_INFO)):
     t = MyThread(SNKRs=SNKRs, email=BOT_INFO[ind]["email"],
                  password=BOT_INFO[ind]["password"], cv_number=BOT_INFO[ind]["cv_number"],
