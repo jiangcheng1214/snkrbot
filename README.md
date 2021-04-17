@@ -1,12 +1,15 @@
 # snkrbot
 
+## Setup
+
 `python3 -m venv env`
 `source env/bin/activate`
 `pip install -r requirements.txt`
 
-python nikeV4.py
+`python nikeV4.py`
 
-reference links:
+## Reference links:
+
 Virtual credit card service: https://privacy.com
 
 SNKRS accounts: https://copaccounts.com/collections/nike-accounts
