@@ -10,7 +10,7 @@
 
 ## Reference links:
 
-Virtual credit card service: https://privacy.com
+Virtual credit card service: https://privacy.com/join/5XWZ7
 
 SNKRS accounts: https://copaccounts.com/collections/nike-accounts
 
