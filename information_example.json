@@ -1,0 +1,13 @@
+[
+  {
+    "email": "account1@gmail.com",
+    "password": "password1",
+    "cv_number": "123"
+  },
+  {
+    "email": "account2@gmail.com",
+    "password": "password2",
+    "cv_number": "234"
+  },
+  // ...
+]
