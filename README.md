@@ -8,5 +8,7 @@ python nikeV4.py
 
 reference links:
 Virtual credit card service: https://privacy.com
+
 SNKRS accounts: https://copaccounts.com/collections/nike-accounts
+
 Rotating proxy service: https://free-proxy-list.net/rotating-proxy.html
