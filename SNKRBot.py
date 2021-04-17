@@ -152,6 +152,9 @@ class SNKRBot:
                 except Exception as e:
                     log_exception(self.driver, self.thread_id)
                 try:
+                    if not self.handle_popup_confirmation():
+                        self.log("Failed to handle popup confirmation")
+                        return False
                     size_button.click()
                     self.log("Size clicked {}".format(size_button_xpath))
                     return True
@@ -405,6 +408,24 @@ class SNKRBot:
             log_exception(self.driver, self.thread_id)
             return False
 
+    def handle_popup_confirmation(self):
+        if self.driver.find_elements_by_xpath('//a[@class="ncss-btn-primary-dark cta-btn btn-lg"]'):
+            self.log("Pop up confirmation detected!")
+            save_page(self.driver, self.thread_id)
+            try:
+                self.driver.find_elements_by_xpath('//a[@class="ncss-btn-primary-dark cta-btn btn-lg"]')[
+                    0].click()
+                self.log("Pop up window clicked")
+                save_page(self.driver, self.thread_id)
+                return True
+            except Exception:
+                log_exception(self.driver, self.thread_id)
+                self.log("POPUP WINDOW error")
+                return False
+        else:
+            self.log("Pop up confirmation not detected!")
+            return True
+
     def run(self):
         self.log("start! release time: {}".format(self.release_time))
         # Wait until 1(2) minutes before release time
@@ -516,19 +537,9 @@ class SNKRBot:
                         continue
 
                 try:
-                    if self.driver.find_elements_by_xpath('//a[@class="ncss-btn-primary-dark cta-btn btn-lg"]'):
-                        self.log("Pop up window!")
-                        save_page(self.driver, self.thread_id)
-                        try:
-                            self.driver.find_elements_by_xpath('//a[@class="ncss-btn-primary-dark cta-btn btn-lg"]')[
-                                0].click()
-                            self.log("Pop up window clicked")
-                            save_page(self.driver, self.thread_id)
-                        except Exception:
-                            log_exception(self.driver, self.thread_id)
-                            self.url_results[i] = "POPUP WINDOW"
-                            self.log("POPUP WINDOW error")
-                            break
+                    if not self.handle_popup_confirmation():
+                        self.url_results[i] = "POPUP WINDOW"
+                        break
                     WebDriverWait(self.driver, 1).until(expected_conditions.presence_of_element_located(
                         (By.XPATH, '//button[@data-qa="save-button"]')))
                     self.log("Detected payment pop out")

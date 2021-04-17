@@ -11,11 +11,15 @@ Onetime setup
 1. Log into nike account and make sure a) payment info and b) shipping info are properly setup (IMPORTANT!)
 2. Update info/information.json with account information (see information_example.json) 
 3. Install chrome driver and update local path -> CHROMEDRIVER_BIN_PATH
+
+Setup for next SNKRs drop
+1. Update info/config.json with account information (see config_example.json)
 '''
 
 # Step
 CHROMEDRIVER_BIN_PATH = '/usr/local/bin/chromedriver'
 BOT_INFO = json.loads(open(os.path.dirname(os.path.abspath(__file__)) + '/info/information.json', "r").read())
+BOT_CONFIG = json.loads(open(os.path.dirname(os.path.abspath(__file__)) + '/info/config.json', "r").read())
 
 
 class SNKRThreadedBot(threading.Thread):
@@ -36,14 +40,9 @@ class SNKRConfig:
         self.is_debug = is_debug
 
 
-# Step 1 - update date (time shouldn't need to be changed.)
-release_time = datetime.datetime(2021, 4, 16, 7, 0)
-
-# Step 2 - update nike snkrs link and preferred sizes (convert to US men for women only sneakers)
-SNKRConfigs = [
-    SNKRConfig("https://www.nike.com/launch/t/air-more-uptempo-black-and-varsity-red", ['10'], is_debug=False),
-    SNKRConfig("https://www.nike.com/launch/t/womens-dunk-low-green-glow", ['7.5'], is_debug=False),
-]
+date = BOT_CONFIG['drop_date'].split('/')
+release_time = datetime.datetime(int(date[0]), int(date[1]), int(date[2]), 7, 0)
+SNKRConfigs = [SNKRConfig(item['link'], item['sizes'], item['is_debug']) for item in BOT_CONFIG['drop_list']]
 
 threads = []
 
