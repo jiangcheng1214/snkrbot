@@ -1,6 +1,4 @@
 import datetime
-import json
-import os
 import time
 from random import random
 
@@ -19,7 +17,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from utils import log, wait_until, type_with_delay, log_exception, save_page
 
-
 call_site = 'nikeV4'
 size_dropdown_xpath = '//button[@data-qa="size-dropdown"]'
 refreshing_xpath = '//div[text()="refresh"]'
@@ -30,14 +27,21 @@ submit_order_xpath = '//button[@data-qa="save-button" and text()="Submit Order"]
 continue_button_xpath = '//button[@data-qa="save-button" and text()="Save & Continue"]'
 
 refresh_wait_time_in_second = 5
+
+
 # Step 0: fill in payment information and emails
 
-BOT_INFO = json.loads(open(os.path.dirname(os.path.abspath(__file__)) + '/info/information.json', "r").read())
+class SNKRConfig:
+    def __init__(self, url, size_list, is_debug=False):
+        self.url = url
+        self.size_list = size_list
+        self.is_debug = is_debug
 
 
 class SNKRBot:
 
-    def __init__(self, chrome_driver_bin_path, email, password, cv_number, SNKRConfigs, release_time, headless, thread_id, proxy=None):
+    def __init__(self, chrome_driver_bin_path, email, password, cv_number, SNKRConfigs, release_time, headless,
+                 thread_id, proxy=None):
         options = Options()
         # setup userAgent
         software_names = [SoftwareName.CHROME.value]
@@ -78,33 +82,43 @@ class SNKRBot:
     def log_in(self):
         self.driver.get("https://www.nike.com/launch")
         time.sleep(2)
+        save_page(self.driver, self.thread_id)
         while not self.driver.find_elements_by_xpath('//span[@data-qa="user-name"]'):
             try:
                 WebDriverWait(self.driver, 1).until(expected_conditions.presence_of_element_located(
                     (By.XPATH, '//button[@data-qa="top-nav-join-or-login-button"]')))
+                self.log("Login Attempt...")
+                save_page(self.driver, self.thread_id)
                 if self.driver.find_elements_by_xpath('//button[@data-qa="top-nav-join-or-login-button"]'):
                     self.driver.find_elements_by_xpath('//button[@data-qa="top-nav-join-or-login-button"]')[0].click()
+                    self.log("Login button clicked...")
+                    save_page(self.driver, self.thread_id)
                 else:
                     self.log("Missing: {}".format('//button[@data-qa="top-nav-join-or-login-button"]'))
+                    save_page(self.driver, self.thread_id)
                     return False
                 WebDriverWait(self.driver, 1).until(
                     expected_conditions.presence_of_element_located((By.XPATH, '//input[@type="email"]')))
                 time.sleep(0.5)
                 if not type_with_delay(self.driver, '//input[@type="email"]', self.email):
                     return False
+                self.log("Email typed.")
+                save_page(self.driver, self.thread_id)
                 time.sleep(2)
                 if not type_with_delay(self.driver, '//input[@type="password"]', self.password):
                     return False
-                time.sleep(1)
+                self.log("Password typed.")
+                save_page(self.driver, self.thread_id)
                 self.driver.find_elements_by_xpath('//input[@type="password"]')[0].send_keys(Keys.ENTER)
                 WebDriverWait(self.driver, 5).until(expected_conditions.presence_of_element_located(
                     (By.XPATH, '//span[@data-qa="user-name"]')))
             except TimeoutException:
                 if self.driver.find_elements_by_xpath('//input[@value="Dismiss this error"]'):
-                    save_page(self.driver, self.thread_id)
                     self.log("Found: {}".format('//input[@value="Dismiss this error"]'))
+                    save_page(self.driver, self.thread_id)
                     self.driver.find_elements_by_xpath('//input[@value="Dismiss this error"]')[0].click()
                     self.log("Dismissed: {}".format('//input[@value="Dismiss this error"]'))
+                    save_page(self.driver, self.thread_id)
                 self.driver.refresh()
                 time.sleep(2)
                 continue

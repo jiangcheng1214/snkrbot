@@ -3,7 +3,7 @@ import json
 import os
 import threading
 
-from SNKRBot import SNKRBot
+from SNKRBot import SNKRBot, SNKRConfig
 from utils import log
 
 '''
@@ -23,21 +23,16 @@ BOT_CONFIG = json.loads(open(os.path.dirname(os.path.abspath(__file__)) + '/info
 
 
 class SNKRThreadedBot(threading.Thread):
-    def __init__(self, chrome_driver_bin_path, SNKRConfigs, email, password, cv_number, release_time, headless, thread_id, proxy=None):
+    def __init__(self, chrome_driver_bin_path, SNKRConfigs, email, password, cv_number, release_time, headless,
+                 thread_id, proxy=None):
         threading.Thread.__init__(self)
-        self.bot = SNKRBot(chrome_driver_bin_path, email, password, cv_number, SNKRConfigs, release_time, headless, thread_id, proxy)
+        self.bot = SNKRBot(chrome_driver_bin_path, email, password, cv_number, SNKRConfigs, release_time, headless,
+                           thread_id, proxy)
         self.email = email
 
     def run(self):
         log("Starting {}".format(self.email))
         self.bot.run()
-
-
-class SNKRConfig:
-    def __init__(self, url, size_list, is_debug=False):
-        self.url = url
-        self.size_list = size_list
-        self.is_debug = is_debug
 
 
 date = BOT_CONFIG['drop_date'].split('/')
@@ -47,7 +42,8 @@ SNKRConfigs = [SNKRConfig(item['link'], item['sizes'], item['is_debug']) for ite
 threads = []
 
 for ind in range(len(BOT_INFO)):
-    t = SNKRThreadedBot(chrome_driver_bin_path=CHROMEDRIVER_BIN_PATH, SNKRConfigs=SNKRConfigs, email=BOT_INFO[ind]["email"],
+    t = SNKRThreadedBot(chrome_driver_bin_path=CHROMEDRIVER_BIN_PATH, SNKRConfigs=SNKRConfigs,
+                        email=BOT_INFO[ind]["email"],
                         password=BOT_INFO[ind]["password"], cv_number=BOT_INFO[ind]["cv_number"],
                         release_time=release_time,
                         headless=False, thread_id=ind)
